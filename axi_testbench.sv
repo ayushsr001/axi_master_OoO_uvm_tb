@@ -148,7 +148,7 @@
 
     typedef enum {READ_TXN, WRITE_TXN} txn_type;
 
-    class axi_transaction extends uvm_sequence_item;
+    class axi_transaction #(int DATA_WIDTH=64) extends uvm_sequence_item;
 
       function new(string name = "axi_transaction");
         super.new(name);
@@ -251,7 +251,7 @@
 
  /////////////////////////// DRIVER ////////////////////////////////////////////            
             
-  class axi_m_driver extends uvm_driver;
+          class axi_m_driver extends uvm_driver #(axi_transaction);
   
     `uvm_component_utils("axi_m_driver")
   
@@ -266,20 +266,22 @@
       uvm_config_db(#virtual interface axi_if)::get(this, "", "vif", vif);
     endfunction : build_phase
     
-    extern task drive_aw();
-    extern task drive_wr();
-    extern task drive_wr_resp();
-    extern task drive_ar();
-    extern task drive_rd();
-        
-    task run_phase(uvm_phase phase);
+    extern task drive_aw(axi_transaction txn);
+    extern task drive_wr(axi_transaction txn);
+    extern task collect_wr_resp(axi_transaction txn);
+    extern task drive_ar(axi_transaction txn);
+    extern task collect_rd(axi_transaction txn);
+
+      task drive();
+        drive_aw
+    virtual task run_phase(uvm_phase phase);
       fork begin
         drive_aw();
         drive_wr();
-        drive_wr_resp();
+        collect_wr_resp();
         drive_ar();
-        drive_rd();
-      end
+        collect_rd();
+        join
     endtask : run_phase
         
   endclass : axi_m_driver
