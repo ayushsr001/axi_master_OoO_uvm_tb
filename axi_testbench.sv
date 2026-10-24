@@ -271,17 +271,25 @@
     extern task collect_wr_resp(axi_transaction txn);
     extern task drive_ar(axi_transaction txn);
     extern task collect_rd(axi_transaction txn);
+    extern task send_back_rsp(axi_transaction txn);
 
-      task drive();
-        drive_aw
-    virtual task run_phase(uvm_phase phase);
-      fork begin
-        drive_aw();
-        drive_wr();
-        collect_wr_resp();
-        drive_ar();
-        collect_rd();
+      task drive_the_dut(axi_transaction txn);
+        fork
+          drive_aw(axi_transaction txn);
+          drive_wr(axi_transaction txn);
+          collect_wr_resp(axi_transaction txn);
+          drive_ar(axi_transaction txn);
+          collect_rd(axi_transaction txn);
+          send_back_rsp(axi_transaction txn);
         join
+      endtask : drive_the_dut
+      
+    virtual task run_phase(uvm_phase phase);
+      forever begin
+        get_next_item(req);
+        drive_the_dut(req);
+        item_done();
+      end
     endtask : run_phase
         
   endclass : axi_m_driver
