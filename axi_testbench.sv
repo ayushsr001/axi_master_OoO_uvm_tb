@@ -218,6 +218,8 @@
 
       `uvm_component_utils("axi_m_monitor")
 
+      virtual interface axi_if vif;
+
       function new (string name = "axi_m_monitor", uvm_component parent);
         super.new(name, parent);
       endfunction
@@ -228,17 +230,59 @@
           `uvm_error("[MON] NO-VIF present", UVM_MEDIUM);
       endfunction : build_phase
 
+      extern task sample_aw();
+      extern task sample_wr();
+      extern task sample_wr_resp();
+      extern task sample_ar();
+      extern task sample_rd();
+          
       task run_phase(uvm_phase phase);
-        
-      endtask
+        fork begin
+          sample_aw();
+          sample_wr();
+          sample_wr_resp();
+          sample_ar();
+          sample_rd();
+        end
+      endtask : run_phase
 
   endclass
 
 
  /////////////////////////// DRIVER ////////////////////////////////////////////            
             
-              
+  class axi_m_driver extends uvm_driver;
+  
+    `uvm_component_utils("axi_m_driver")
+  
+    virtual interface axi_if vif;
+  
+    function new (string name = "axi_m_driver", uvm_component parent);
+      super.new(name, parent);
+    endfunction : new
+  
+    function void build_phase(uvm_phase phase);
+      super.build_phase(phase);
+      uvm_config_db(#virtual interface axi_if)::get(this, "", "vif", vif);
+    endfunction : build_phase
+    
+    extern task drive_aw();
+    extern task drive_wr();
+    extern task drive_wr_resp();
+    extern task drive_ar();
+    extern task drive_rd();
+        
+    task run_phase(uvm_phase phase);
+      fork begin
+        drive_aw();
+        drive_wr();
+        drive_wr_resp();
+        drive_ar();
+        drive_rd();
+      end
+    endtask : run_phase
+        
+  endclass : axi_m_driver
 
 
-
-                  
+  /////////////////////////// AGENT ////////////////////////////////////////////              
