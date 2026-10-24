@@ -192,14 +192,14 @@
       constraint axi_data { txn_t == WRITE_TXN -> data.size() == (beat_num);}
       constraint boundary_4k {
         last_addr[31:12] == addr[31:12];            //next address within the same 4k boundary
-        last_addr % beat_size == 0;               //end addr 4k aligned
+        if( burst != 2'b00) {last_addr % beat_size == 0; }              //end addr 4k aligned
                              }
       constraint burst_c { burst != 2'b11; }
       constraint size_c { size <= $clog2(DATA_WIDTH); }
       constraint axi_burst_c { 
         if (burst == 2'b01) {                                 //INCR
         (beat_num) inside {[1:256]};                          //1 to 256 beats
-        //last_addr and addr already taken care 
+        last_addr == (33'd0 + addr + (beat_num - 1) * beat_size) - (33'd0 + addr + (beat_num - 1) * beat_size) % beat_size; 
               }  
         else if (burst == 2'b00) { (beat_num) inside {[1:16]};   //FIXED
                                  last_addr == addr; 
