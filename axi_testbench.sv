@@ -185,7 +185,6 @@
       //Constraints
       constraint beat_size_c { beat_size == (1 << size); }
       constraint beat_num_c { beat_num == len + 9'd1; }
-      constraint last_addr_c { last_addr == (33'd0 + addr + (beat_num - 1) * beat_size) - (33'd0 + addr + (beat_num - 1) * beat_size) % beat_size; }  //end addr 4k aligned
       constraint bound_c { lower_bound == (addr - addr % (beat_size * beat_num) ); 
                            upper_bound == lower_bound + beat_size * (beat_num-1); 
                          }
