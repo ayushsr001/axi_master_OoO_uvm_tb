@@ -251,9 +251,9 @@
 
  /////////////////////////// DRIVER ////////////////////////////////////////////            
             
-          class axi_m_driver extends uvm_driver #(axi_transaction);
+  class axi_m_driver extends uvm_driver #(axi_transaction);
   
-    `uvm_component_utils("axi_m_driver")
+    `uvm_component_utils(axi_m_driver)
   
     virtual interface axi_if vif;
   
@@ -263,32 +263,81 @@
   
     function void build_phase(uvm_phase phase);
       super.build_phase(phase);
-      uvm_config_db(#virtual interface axi_if)::get(this, "", "vif", vif);
+      if(!uvm_config_db(#virtual interface axi_if)::get(this, "", "vif", vif) ) 
+        `uvm_error("[DRV] : no vif present", UVM_MEDIUM);
     endfunction : build_phase
     
-    extern task drive_aw(axi_transaction txn);
-    extern task drive_wr(axi_transaction txn);
-    extern task collect_wr_resp(axi_transaction txn);
-    extern task drive_ar(axi_transaction txn);
-    extern task collect_rd(axi_transaction txn);
-    extern task send_back_rsp(axi_transaction txn);
+    int pending_read[bit [3:0]][$];
+    int pending_write[bit [3:0]][$];
 
-      task drive_the_dut(axi_transaction txn);
-        fork
-          drive_aw(axi_transaction txn);
-          drive_wr(axi_transaction txn);
-          collect_wr_resp(axi_transaction txn);
-          drive_ar(axi_transaction txn);
-          collect_rd(axi_transaction txn);
-          send_back_rsp(axi_transaction txn);
-        join
-      endtask : drive_the_dut
+    task write_addr_channel(axi_transaction txn);
+      // drive the write address channel
+      //No need to caclulate the address for the write data channel - managed by slave
+      vif.cb.awvalid <= 1'b1;
+      vif.cb.awaddr <= txn.addr;
+      vif.cb.awlen <= txn.len;
+      vif.cb.awsize <= txn.size;
+      vif.cb.awburst <= txn.burst;
+      vif.cb.awid <= txn.id;
+      do @(posedge vif.cb) while(!vif.cb.awready);  //wait for the slave to accept the address
+      vif.cb.awvalid <= 1'b0;
+    endtask : write_addr_channel
+
+    task write_data_channel(axi_transaction txn);
+      // drive the write data channel
+      //No need to check if the if the txn is FIXED, WRAP OR INCR - data driving logic remains same
+      //Address being handled by the slave - so just drive the data as per len
+      for(int i=0; i<(txn.len+1); i++) begin
+        vif.cb.wvalid <= 1'b1;
+        vif.cb.wdata <= txn.data[i];
+        if(i == txn.len) vif.cb.wlast <= 1'b1;
+        else vif.cb.wlast <= 1'b0;
+        do @(posedge vif.cb) while(!vif.cb.wready);  //wait for the slave to accept the data
+        vif.cb.wvalid <= 1'b0;
+        vif.cb.wlast <= 1'b0;
+      end
+    endtask : write_data_channel
+
+    task drive_write_txn(axi_transaction txn);
+      fork 
+        write_addr_channel(txn);
+        write_data_channel(txn);
+      join
+      pending_write[txn.id].push_back(txn);   //push the transaction to the pending write response queue
+    endtask : drive_write_txn
+
+    task read_addr_channel(axi_transaction txn);
+      // drive the read address channel
+      //No need to caclulate the address for the write data channel - managed by slave
+      vif.cb.arvalid <= 1'b1;
+      vif.cb.araddr <= txn.addr;
+      vif.cb.arlen <= txn.len;
+      vif.cb.arsize <= txn.size;
+      vif.cb.arburst <= txn.burst;
+      vif.cb.arid <= txn.id;
+      do @(posedge vif.cb) while(!vif.cb.arready);  //wait for the slave to accept the address
+      vif.cb.arvalid <= 1'b0;
+    endtask : read_addr_channel
+
+        
+    task drive_the_dut(axi_transaction txn);
+      fork 
+        begin
+          if(txn.txn_t == WRITE_TXN)  drive_write_txn(txn);
+          else if(txn.txn_t == READ_TXN) drive_read_txn(txn);
+        end
+        poll_read_resp();
+        poll_write_resp();
+      join
+    endtask : drive_the_dut
       
     virtual task run_phase(uvm_phase phase);
       forever begin
-        get_next_item(req);
+        //wait for reset
+        #100;
+        seq_item_port.get_next_item(req);
         drive_the_dut(req);
-        item_done();
+        seq_item_port.item_done();
       end
     endtask : run_phase
         
