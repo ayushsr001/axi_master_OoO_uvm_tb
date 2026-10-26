@@ -1,4 +1,5 @@
-class axi_m_driver extends uvm_driver #(axi_transaction);
+//YET TO BE FIXED
+class axi_m_driver #(parameter int DATA_WIDTH = 64) extends uvm_driver #(axi_transaction);
 
   `uvm_component_utils(axi_m_driver)
 
@@ -16,6 +17,8 @@ class axi_m_driver extends uvm_driver #(axi_transaction);
   
   axi_transaction pending_read[bit [3:0]][$];
   axi_transaction pending_write[bit [3:0]][$];
+  bit [DATA_WIDTH-1:0] read_data[bit [3:0]][$];
+  bit [1:0] read_resp[bit [3:0]][$];
 
   task write_addr_channel(axi_transaction txn);
     // drive the write address channel
@@ -26,7 +29,7 @@ class axi_m_driver extends uvm_driver #(axi_transaction);
     vif.cb.awsize <= txn.size;
     vif.cb.awburst <= txn.burst;
     vif.cb.awid <= txn.id;
-    do @(posedge vif.cb) while(!vif.cb.awready);  //wait for the slave to accept the address
+    do @(vif.cb) while(!vif.cb.awready);  //wait for the slave to accept the address
     vif.cb.awvalid <= 1'b0;
   endtask : write_addr_channel
 
@@ -78,22 +81,26 @@ class axi_m_driver extends uvm_driver #(axi_transaction);
       vif.cb.rready <= 1'b1;  //assert the ready for data to be received
       do @(vif.cb) while(!vif.cb.rvalid);
       while(!pending_read.exists(vif.cb.rid)) begin
-        `uvm_error($sformatf("UNEXPECTED: id=%0d", vif.cb.rid), UVM_MEDIUM);
+        `uvm_info("DRIVER",$sformatf("UNEXPECTED: id=%0d", vif.cb.rid), UVM_MEDIUM);
         @(vif.cb);
         count++;
         if(count > 100) begin
           `uvm_fatal("TIMEOUT", "No pending read transaction found for the response id");
         end
       end
-      resp_txn = pending_read[vif.cb.rid].pop_front();  //pop the transaction from the pending read response queue
       forever begin
-        do @(vif.cb) while(!vif.cb.rvalid);
-        resp_txn.data.push_back(vif.cb.rdata);
-        resp_txn.rresp.push_back(vif.cb.rresp);
+        read_data[vif.cb.rid].push_back(vif.cb.rdata);
+        read_resp[vif.cb.rid].push_back(vif.cb.rresp);
         if(vif.cb.rlast) begin
+          resp_txn = pending_read[vif.cb.rid].pop_front();  //pop the transaction from the pending read response queue
+          resp_txn.data = read_data[vif.cb.rid];
+          resp_txn.rresp = read_resp[vif.cb.rid];
           vif.cb.rready <= 1'b0;  //deassert the ready for data to be received
+          read_data[vif.cb.rid].delete();
+          read_resp[vif.cb.rid].delete();
           break;
         end
+      do @(vif.cb) while(!vif.cb.rvalid);  
       end
       //send the response
       set_id_info(resp_txn);
