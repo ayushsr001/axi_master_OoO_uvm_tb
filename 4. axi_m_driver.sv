@@ -10,12 +10,12 @@ class axi_m_driver extends uvm_driver #(axi_transaction);
 
   function void build_phase(uvm_phase phase);
     super.build_phase(phase);
-    if(!uvm_config_db(#virtual interface axi_if)::get(this, "", "vif", vif) ) 
+    if(!uvm_config_db #(virtual interface axi_if)::get(this, "", "vif", vif) ) 
       `uvm_error("[DRV] : no vif present", UVM_MEDIUM);
   endfunction : build_phase
   
-  int pending_read[bit [3:0]][$];
-  int pending_write[bit [3:0]][$];
+  axi_transaction pending_read[bit [3:0]][$];
+  axi_transaction pending_write[bit [3:0]][$];
 
   task write_addr_channel(axi_transaction txn);
     // drive the write address channel
@@ -73,9 +73,10 @@ class axi_m_driver extends uvm_driver #(axi_transaction);
 
   task poll_read_resp();
     forever begin
-      axi_transaction resp_txn;
-      resp_txn = axi_transaction::type_id::create("resp_txn");
       automatic int count = 0;
+      axi_transaction resp_txn;
+      vif.cb.rready <= 1'b1;  //assert the ready for data to be received
+      do @(vif.cb) while(!vif.cb.rvalid);
       while(!pending_read.exists(vif.cb.rid)) begin
         `uvm_error($sformatf("UNEXPECTED: id=%0d", vif.cb.rid), UVM_MEDIUM);
         @(vif.cb);
@@ -85,18 +86,17 @@ class axi_m_driver extends uvm_driver #(axi_transaction);
         end
       end
       resp_txn = pending_read[vif.cb.rid].pop_front();  //pop the transaction from the pending read response queue
-      vif.cb.rready <= 1'b1;  //assert the ready for data to be received
       forever begin
-        @(vif.cb);
         do @(vif.cb) while(!vif.cb.rvalid);
         resp_txn.data.push_back(vif.cb.rdata);
+        resp_txn.rresp.push_back(vif.cb.rresp);
         if(vif.cb.rlast) begin
           vif.cb.rready <= 1'b0;  //deassert the ready for data to be received
           break;
         end
       end
       //send the response
-      set_info_id(resp_txn);
+      set_id_info(resp_txn);
       seq_item_port.put_response(resp_txn);
       if(pending_read[resp_txn.id].size() == 0) pending_read.delete(resp_txn.id);  //delete the queue if all the transactions are completed
     end
@@ -104,11 +104,10 @@ class axi_m_driver extends uvm_driver #(axi_transaction);
 
   task poll_write_resp();
     forever begin
+      automatic int count = 0;
       axi_transaction resp_txn;
-      resp_txn = axi_transaction::type_id::create("resp_txn");
       vif.cb.bready <= 1'b1;  //assert the ready for data to be received
       do @(vif.cb) while(!vif.cb.bvalid);
-      automatic int count = 0;
       while(!pending_write.exists(vif.cb.bid)) begin
         `uvm_error($sformatf("UNEXPECTED: id=%0d", vif.cb.bid), UVM_MEDIUM);
         @(vif.cb);
@@ -118,10 +117,10 @@ class axi_m_driver extends uvm_driver #(axi_transaction);
         end
       end
       resp_txn = pending_write[vif.cb.bid].pop_front();  //pop the transaction from the pending write response queue
-      resp_txn.resp <= vif.cb.bresp;
+      resp_txn.bresp = vif.cb.bresp;
       vif.cb.bready <= 1'b0;  //deassert the ready for data to be received
       //send the response
-      set_info_id(resp_txn);
+      set_id_info(resp_txn);
       seq_item_port.put_response(resp_txn);
       if(pending_write[resp_txn.id].size() == 0) pending_write.delete(resp_txn.id);  //delete the queue if all the transactions are completed
     end
@@ -133,8 +132,8 @@ class axi_m_driver extends uvm_driver #(axi_transaction);
   endtask : drive_the_dut
     
   virtual task run_phase(uvm_phase phase);
-    //wait for reset
-    #100;
+    //wait for dut to come out of reset
+    @(vif.cb.rst_n);
     fork
       poll_read_resp();
       poll_write_resp();
