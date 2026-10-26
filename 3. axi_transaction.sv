@@ -16,7 +16,8 @@ class axi_transaction #(int DATA_WIDTH=64) extends uvm_sequence_item;
   rand bit [2:0] size;     //0 -> 1B; 1 -> 2B, 111 -> 128B (MUST NOT EXCEED DATA WIDTH)
   rand bit [7:0] len;      // No of transfers per transactions
   rand bit [DATA_WIDTH-1:0] data[$];
-  bit [1:0] resp;          // OKAY, EXOKAY, SLVERR, DECERR
+  bit [1:0] bresp;          // OKAY, EXOKAY, SLVERR, DECERR
+  bit [1:0] rresp[$];       //per-beat rresp needs to be captured
 
   rand bit [7:0] beat_size;
   rand bit [9:0] beat_num;
