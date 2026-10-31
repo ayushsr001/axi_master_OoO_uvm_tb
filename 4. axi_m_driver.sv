@@ -1,4 +1,3 @@
-//YET TO BE FIXED
 class axi_m_driver #(parameter int DATA_WIDTH = 64) extends uvm_driver #(axi_transaction);
 
   `uvm_component_utils(axi_m_driver)
