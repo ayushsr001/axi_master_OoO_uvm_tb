@@ -38,7 +38,7 @@ class axi_m_driver #(parameter int DATA_WIDTH = 64) extends uvm_driver #(axi_tra
     vif.cb.awsize  <= txn.size;
     vif.cb.awburst <= txn.burst;
     vif.cb.awid    <= txn.id;
-    do @(vif.cb); while (!vif.cb.awready);
+    do @(vif.cb); while (!vif.cb.awready);  //The condition is evaluated at T1, using the value AWREADY had just before T1.
     vif.cb.awvalid <= 1'b0;
   endtask
 
