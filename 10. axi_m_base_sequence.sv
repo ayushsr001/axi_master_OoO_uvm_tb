@@ -35,6 +35,7 @@ class axi_base_seq extends uvm_sequence #(axi_transaction);
                               size  == 3; })               // full-width beats; matches the 64-bit bus
       `uvm_fatal(get_type_name(), "write randomize failed")
     finish_item(t);
+    //we could have declared the rsp handle locally just like we did for "t" but then sequence extending the base class will have no visibilty or access to this handle.
     get_response(rsp);                                     // blocks until the driver's B collector returns it
     if (rsp.bresp != 2'b00)
       `uvm_warning(get_type_name(), $sformatf("write addr=0x%0h BRESP=%0b", a, rsp.bresp))
