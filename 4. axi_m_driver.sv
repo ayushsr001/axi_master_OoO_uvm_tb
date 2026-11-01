@@ -153,7 +153,11 @@ class axi_m_driver #(parameter int DATA_WIDTH = 64) extends uvm_driver #(axi_tra
 
 endclass : axi_m_driver
 
+
+    
 ////////////////////////////////// My version ////////////////////////////////////////////
+//Still need some work, upper one is claude response based on the code below
+    
 class axi_m_driver #(parameter int DATA_WIDTH = 64) extends uvm_driver #(axi_transaction);
 
   `uvm_component_utils(axi_m_driver #(DATA_WIDTH))
