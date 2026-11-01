@@ -65,6 +65,8 @@ class axi_m_driver #(parameter int DATA_WIDTH = 64) extends uvm_driver #(axi_tra
   endtask
 
   task drive_write_txn(axi_transaction txn);
+    //The queue holds a handle (a reference), not a copy, so it doesn’t matter that the response fields are still empty when you push. 
+    //The object is the same one the collector will fill in later.
     pending_write[txn.id].push_back(txn);   // queued BEFORE any response can exist
     fork
       write_addr_channel(txn);
